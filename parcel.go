@@ -3,6 +3,7 @@ package main
 import (
 	"database/sql"
 	"fmt"
+	"log"
 )
 
 type ParcelStore struct {
@@ -21,13 +22,12 @@ func (s ParcelStore) Add(p Parcel) (int, error) {
 		sql.Named("address", p.Address),
 		sql.Named("created_at", p.CreatedAt))
 	if err != nil {
-		fmt.Println(err)
 		return 0, err
 	}
 	// верните идентификатор последней добавленной записи
 	lastId, err := res.LastInsertId()
 	if err != nil {
-		fmt.Println(err)
+		return 0, err
 	}
 	return int(lastId), nil
 }
@@ -41,7 +41,7 @@ func (s ParcelStore) Get(number int) (Parcel, error) {
 	p := Parcel{}
 	err := row.Scan(&p.Number, &p.Client, &p.Status, &p.Address, &p.CreatedAt)
 	if err != nil {
-		fmt.Println(err)
+		return p, err
 	}
 	return p, nil
 }
@@ -51,7 +51,7 @@ func (s ParcelStore) GetByClient(client int) ([]Parcel, error) {
 	// здесь из таблицы может вернуться несколько строк
 	rows, err := s.db.Query("SELECT * FROM parcel WHERE number = :number", sql.Named("number", client))
 	if err != nil {
-		fmt.Println(err)
+		return nil, err
 	}
 
 	// заполните срез Parcel данными из таблицы
@@ -65,7 +65,10 @@ func (s ParcelStore) GetByClient(client int) ([]Parcel, error) {
 		}
 		res = append(res, resBuf)
 	}
-
+	err = rows.Err()
+	if err != nil {
+		log.Fatal(err)
+	}
 	return res, nil
 }
 
@@ -84,9 +87,10 @@ func (s ParcelStore) SetStatus(number int, status string) error {
 func (s ParcelStore) SetAddress(number int, address string) error {
 	// реализуйте обновление адреса в таблице parcel
 	// менять адрес можно только если значение статуса registered
-	_, err := s.db.Exec("UPDATE parcel SET address = :address WHERE number = :number",
+	_, err := s.db.Exec("UPDATE parcel SET address = :address WHERE number = :number AND status = :status",
 		sql.Named("address", address),
-		sql.Named("number", number))
+		sql.Named("number", number),
+		sql.Named("status", ParcelStatusRegistered))
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -97,17 +101,10 @@ func (s ParcelStore) SetAddress(number int, address string) error {
 func (s ParcelStore) Delete(number int) error {
 	// реализуйте удаление строки из таблицы parcel
 	// удалять строку можно только если значение статуса registered
-	var delStatus string
-	row := s.db.QueryRow("SELECT status FROM parcel WHERE number = :number", sql.Named("number", number))
-	err := row.Scan(&delStatus)
+
+	_, err := s.db.Exec("DELETE from parcel WHERE number = :number AND status = :status", sql.Named("number", number), sql.Named("status", ParcelStatusRegistered))
 	if err != nil {
 		return err
-	}
-	if delStatus == ParcelStatusRegistered {
-		_, err := s.db.Exec("DELETE from parcel WHERE number = :number", sql.Named("number", number))
-		if err != nil {
-			return err
-		}
 	}
 
 	return nil
