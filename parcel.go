@@ -2,8 +2,6 @@ package main
 
 import (
 	"database/sql"
-	"fmt"
-	"log"
 )
 
 type ParcelStore struct {
@@ -53,7 +51,7 @@ func (s ParcelStore) GetByClient(client int) ([]Parcel, error) {
 	if err != nil {
 		return nil, err
 	}
-
+	defer rows.Close()
 	// заполните срез Parcel данными из таблицы
 	var res []Parcel
 
@@ -67,7 +65,7 @@ func (s ParcelStore) GetByClient(client int) ([]Parcel, error) {
 	}
 	err = rows.Err()
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 	return res, nil
 }
@@ -78,7 +76,7 @@ func (s ParcelStore) SetStatus(number int, status string) error {
 		sql.Named("status", status),
 		sql.Named("number", number))
 	if err != nil {
-		fmt.Println(err)
+		return err
 	}
 
 	return nil
@@ -92,7 +90,7 @@ func (s ParcelStore) SetAddress(number int, address string) error {
 		sql.Named("number", number),
 		sql.Named("status", ParcelStatusRegistered))
 	if err != nil {
-		fmt.Println(err)
+		return err
 	}
 
 	return nil
